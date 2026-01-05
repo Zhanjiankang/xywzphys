@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 
+        index.html - 物含妙理网站主页面
+        文件说明：
+        1. 此文件是网站的主HTML结构文件
+        2. 实现了HTML结构与样式、逻辑的完全分离
+        3. 使用外部CSS和JavaScript文件
+        4. 采用响应式设计，支持多设备访问
+    -->
+    
+    <!-- 基础元数据 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物含妙理 - 边城</title>
+    
+    <!-- 外部样式表引用 -->
+    <!-- Bootstrap 5 CSS框架 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 自定义样式文件 -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Model Viewer 3D模型查看器 -->
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    
+    <!-- 机器人界面样式 -->
+    <style>
+        /* 机器人界面样式 */
+        :root { --cyan: rgba(255, 255, 255, 0); --dark: #ffffff; }
+        
+        /* 3D 舞台 - 右下角定位（更小尺寸，无边框） */
+        model-viewer {
+            position: fixed;
+            bottom: 20px;
+            right: 10px;
+            width: 150px;
+            height: 250px;
+            /* 设置白色半透明背景 */
+            background: rgba(255, 255, 255, 0);
+            --progress-bar-color: var(--cyan);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(15, 14, 14, 0);
+            z-index: 9999; /* 置于最上层 */
+        }
+        
+        /* 聊天面板 - 置于机器人左侧（白色透明背景，黑色边框） */
+        #panel {
+            display: none; position: fixed; bottom: 20px; right: 165px;
+            width: 350px; height: 500px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid #ffffff; border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            flex-direction: column; overflow: hidden; backdrop-filter: blur(5px);
+            z-index: 9998; /* 仅次于3D模型 */
+        }
+        
+        .panel-header {
+            padding: 15px; border-bottom: 1px solid #000;
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255, 255, 255, 0.3);
+            color: #000;
+        }
+        
+        .panel-header i {
+            color: #000;
+        }
+        
+        #logs { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        
+        .msg { padding: 10px; border-radius: 5px; font-size: 13px; line-height: 1.4; max-width: 85%; }
+        .sys { color: #000; border-left: 2px solid var(--cyan); background: rgba(0, 243, 255, 0); align-self: flex-start; }
+        .user { color: #000; background: rgba(200, 200, 200, 0.3); align-self: flex-end; border: 1px solid #ccc; }
+        
+        .input-zone { padding: 15px; border-top: 1px solid #000; }
+        .input-group { display: flex; }
+        .input-group input { 
+            flex: 1; 
+            background: transparent; 
+            border: 1px solid #000; 
+            color: #000; 
+            padding: 8px 12px; 
+            outline: none;
+            border-radius: 4px 0 0 4px;
+            border-right: none;
+        }
+        .input-group button { 
+            background: #000; 
+            color: #fff; 
+            border: 1px solid #000;
+            padding: 8px 15px; 
+            font-weight: bold; 
+            cursor: pointer;
+            border-radius: 0;
+        }
+        .input-group button:first-child {
+            border-radius: 0;
+            border-right: none;
+        }
+        .input-group button:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        .input-group button.btn-outline-secondary {
+            background: transparent;
+            color: #000;
+            border-color: #000;
+        }
+        .input-group button.btn-outline-secondary:hover {
+            background: #000;
+            color: #fff;
+        }
+        .input-group button.btn-danger {
+            background: #dc3545;
+            border-color: #dc3545;
+        }
+        .input-group button.btn-primary {
+            background: #000;
+            border-color: #000;
+        }
+        .input-group button.btn-primary:hover {
+            background: #333;
+            border-color: #333;
+        }
+        #voiceStatus {
+            font-size: 12px;
+            color: #dc3545;
+            margin-top: 5px;
+        }
+        
+        /* 机器人图标样式 */
+        .robot-icon {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #f5faff 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9997; /* 机器人图标在聊天框下方 */
+            box-shadow: 0 0 15px linear-gradient(135deg, #e3f2fd 0%, #f5faff 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .robot-icon:hover {
+            background: rgba(0, 243, 255, 1);
+            transform: scale(1.1);
+        }
+        
+        .robot-icon i {
+            font-size: 24px;
+            color: #080808;
+        }
+        
+        /* 交互提示 */
+        .hint {
+            position: absolute; bottom: 20px; width: 100%; text-align: center;
+            color: rgba(255,255,255,0.5); font-size: 12px; pointer-events: none;
+            z-index: 9996; /* 提示文本在最底层 */
+        }
+        
+        /* 响应式设计 - 平板设备 */
+        @media (max-width: 1024px) {
+            #panel {
+                width: 320px;
+                height: 450px;
+                right: 140px;
+            }
+            
+            model-viewer {
+                width: 130px;
+                height: 220px;
+                right: 8px;
+            }
+            
+            .robot-icon {
+                width: 55px;
+                height: 55px;
+                right: 15px;
+            }
+            
+            .robot-icon i {
+                font-size: 22px;
+            }
+        }
+        
+        /* 响应式设计 - 手机设备 */
+        @media (max-width: 768px) {
+            #panel {
+                width: calc(100% - 40px);
+                height: 400px;
+                right: 20px;
+                left: 20px;
+                bottom: 100px;
+            }
+            
+            model-viewer {
+                width: 100px;
+                height: 180px;
+                right: 5px;
+                bottom: 10px;
+            }
+            
+            .robot-icon {
+                width: 50px;
+                height: 50px;
+                right: 10px;
+                bottom: 10px;
+            }
+            
+            .robot-icon i {
+                font-size: 20px;
+            }
+            
+            .panel-header {
+                padding: 12px;
+                font-size: 14px;
+            }
+            
+            #logs {
+                padding: 10px;
+            }
+            
+            .msg {
+                padding: 8px;
+                font-size: 12px;
+                max-width: 90%;
+            }
+            
+            .input-zone {
+                padding: 10px;
+            }
+            
+            .input-group input {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+            
+            .input-group button {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+            
+            .hint {
+                font-size: 11px;
+                bottom: 15px;
+            }
+        }
+        
+        /* 响应式设计 - 小手机设备 */
+        @media (max-width: 480px) {
+            #panel {
+                height: 350px;
+                bottom: 90px;
+            }
+            
+            model-viewer {
+                width: 80px;
+                height: 150px;
+            }
+            
+            .robot-icon {
+                width: 45px;
+                height: 45px;
+            }
+            
+            .robot-icon i {
+                font-size: 18px;
+            }
+            
+            .panel-header {
+                padding: 10px;
+                font-size: 13px;
+            }
+            
+            #logs {
+                padding: 8px;
+            }
+            
+            .msg {
+                padding: 6px;
+                font-size: 11px;
+            }
+            
+            .input-group input {
+                padding: 5px 8px;
+                font-size: 13px;
+            }
+            
+            .input-group button {
+                padding: 5px 10px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- ==================== 网站头部区域 ==================== -->
+    <!-- 包含导航栏和日期显示 -->
+    <div class="header">
+        <!-- 导航栏组件 -->
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container-fluid">
+                <!-- 网站品牌标识 -->
+                <a class="navbar-brand" href="#">
+                    <i class="fas fa-atom me-2"></i>物含妙理
+                </a>
+                
+                <!-- 移动端导航切换按钮 -->
+                <button class="navbar-toggler" type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#navbarNavDropdown" 
+                        aria-controls="navbarNavDropdown" 
+                        aria-expanded="false" 
+                        aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <!-- 导航菜单 -->
+                <div class="collapse navbar-collapse justify-content-center" id="navbarNavDropdown">
+                    <ul class="navbar-nav">
+                        <!-- 教学模块下拉菜单 -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">教学</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="教学/可视化/visualization.html">可视化</a></li>
+                                <li><a class="dropdown-item" href="教学/重难点/index.html">重难点</a></li>
+                            </ul>
+                        </li>
+                        
+                        <!-- 理论模块下拉菜单 -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">理论</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="理论/高中/index.html">高中物理</a></li>
+                                <li><a class="dropdown-item" href="理论/竞赛/index.html">竞赛一轮</a></li>
+                            </ul>
+                        </li>
+                        
+                        <!-- 工具模块下拉菜单 -->
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" 
+                               data-bs-toggle="dropdown" aria-expanded="false">工具</a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="工具/班级排名.html">排名分析</a></li>
+                                <li><a class="dropdown-item" href="工具/物理图片/index.html">相关图片</a></li>
+                                <li><a class="dropdown-item" href="工具/参考文章/index.html">资料分享</a></li>
+                            </ul>
+                        </li>
+                        
+                        <!-- 单页导航链接 -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="相关网站/index.html">相关网站</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="班级纪实/index.html">班级纪实</a>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- 当前日期显示区域 -->
+                <div class="date-display" id="currentDate">----年--月--日 星期-</div>
+            </div>
+        </nav>
+    </div>
+
+    <!-- ==================== 登录模态框 ==================== -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="loginModalLabel"><i class="fas fa-user me-2"></i>用户登录</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div class="alert alert-danger d-none" id="loginError">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <span id="loginErrorText">用户名或密码错误</span>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="loginBtn">登录</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 主内容区域 ==================== -->
+    <!-- 使用Bootstrap容器包裹主要内容 -->
+    <div class="container">
+        <!-- 网格布局容器 - 2x2布局 -->
+        <div class="grid-container">
+            
+            <!-- 网格项1：最近更新模块 -->
+            <div class="grid-item update-item">
+                <div class="grid-header">
+                    <h3 class="grid-title"><i class="fas fa-newspaper me-2"></i>最近更新</h3>
+                    <!-- 刷新按钮 -->
+                    <button id="refreshUpdates" class="btn-refresh">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="grid-content">
+                    <!-- 最后更新时间显示 -->
+                    <div id="lastUpdated" class="small mb-2" style="color: var(--text-gray);"></div>
+                    
+                    <!-- 加载指示器 -->
+                    <div id="loadingIndicator" class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        <p class="mt-2 small" style="color: var(--text-gray);">正在加载最新内容...</p>
+                    </div>
+                    
+                    <!-- 更新列表容器 -->
+                    <ul id="latestUpdatesList" class="list d-none"></ul>
+                    
+                    <!-- 错误消息显示 -->
+                    <div id="errorMessage" class="alert alert-danger d-none small mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="errorText">加载内容时出现错误</span>
+                    </div>
+                    
+                    <!-- 空状态消息 -->
+                    <div id="emptyMessage" class="alert alert-info d-none small mb-0">
+                        <i class="fas fa-info-circle me-2"></i>暂无更新内容
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 网格项2：随机点名模块 -->
+            <div class="grid-item rollcall-item">
+                <div class="grid-header">
+                    <h3 class="grid-title"><i class="fas fa-users me-2"></i>随机点名</h3>
+                    <!-- 班级选择和用户信息 -->
+                    <div class="user-info">
+                        <span id="userDisplay" class="d-none">
+                            <i class="fas fa-user me-1"></i>
+                            <span id="usernameDisplay"></span>
+                            <button id="logoutBtn" class="btn btn-sm btn-outline-secondary ms-2">退出</button>
+                        </span>
+                        <button id="loginTrigger" class="btn btn-sm btn-outline-primary">登录</button>
+                    </div>
+                </div>
+                <div class="grid-content">
+                    <!-- 顶部：班级选择区域 -->
+                    <div id="classSelection" class="d-none mb-4">
+                        <div class="d-flex align-items-center justify-content-between gap-3">
+                            <label for="classSelect" class="form-label mb-0">选择班级：</label>
+                            <select class="form-select flex-grow-1" id="classSelect">
+                                <option value="">请选择班级</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 底部：点名按钮和学生显示区域 -->
+                    <div class="text-center w-100">
+                        <!-- 点名按钮 -->
+                        <button class="btn-action mb-4" id="rollcallBtn" disabled>
+                            <i class="fas fa-random me-2"></i>开始随机点名
+                        </button>
+                        <!-- 被选中学生显示区域 -->
+                        <div id="selectedStudent">请先登录并选择班级</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 网格项3：今日格言模块 -->
+            <div class="grid-item quote-item">
+                <div class="grid-header">
+                    <h3 class="grid-title"><i class="fas fa-quote-left me-2"></i>今日格言</h3>
+                    <!-- 更换格言按钮 -->
+                    <button id="changeQuote" class="btn-refresh">
+                        <i class="fas fa-sync-alt"></i> 换一句
+                    </button>
+                </div>
+                <div class="grid-content">
+                    <!-- 格言文本显示 -->
+                    <p id="quoteText">格言加载中...</p>
+                    <!-- 格言作者显示 -->
+                    <p id="quoteAuthor"></p>
+                </div>
+            </div>
+            
+            <!-- 网格项4：每日一问模块 -->
+            <div class="grid-item question-item">
+                <div class="grid-header">
+                    <h3 class="grid-title"><i class="fas fa-question-circle me-2"></i>每日一问</h3>
+                    <!-- 更换问题按钮 -->
+                    <button id="changeQuestion" class="btn-refresh">
+                        <i class="fas fa-sync-alt"></i> 换一题
+                    </button>
+                </div>
+                <div class="grid-content">
+                    <!-- 问题文本显示 -->
+                    <p id="questionText">问题加载中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 网站页脚区域 ==================== -->
+    <footer id="about">
+        <div class="container">
+            <p class="mb-0" style="color: var(--text-dark);">© 2025 边城 | 探索物理世界的奥秘</p>
+        </div>
+    </footer>
+
+    <!-- ==================== 机器人交互界面 ==================== -->
+    <!-- 机器人图标 - 初始显示在页脚 -->
+    <div id="robot-icon" class="robot-icon" onclick="toggleRobot()">
+        <i class="fas fa-robot"></i>
+    </div>
+
+    <!-- 3D 模型：使用最稳定的 RobotExpressive -->
+    <!-- 关键参数：environment-image="neutral" 防止黑屏 -->
+    <model-viewer 
+        id="bot" 
+        src="Robot.glb" 
+        environment-image="neutral" 
+        shadow-intensity="1"
+        camera-controls 
+        camera-orbit="0deg 75deg 105%"
+        field-of-view="30deg"
+        autoplay
+        animation-name="Idle"
+        style="display: none;">
+    </model-viewer>
+
+    <div class="hint" style="display: none;">/// 点击机器人终端建立连接 ///</div>
+
+    <!-- 交互面板 -->
+    <div id="panel" style="display: none;">
+        <div class="panel-header">
+            <span><i class="fas fa-terminal"></i> JARVIS 助手</span>
+            <i class="fas fa-times" style="cursor:pointer" onclick="toggleRobot()"></i>
+        </div>
+        <div id="logs"></div>
+        <div class="input-zone">
+            <div class="input-group">
+                <input type="text" id="ipt" placeholder="点击语音按钮开始说话或直接输入...">
+                <button class="btn btn-outline-secondary" type="button" id="voiceBtn" onclick="toggleVoiceInput()">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="btn btn-primary" type="button" onclick="send()">发送</button>
+            </div>
+            <div id="voiceStatus" class="mt-2 small text-center" style="display: none;">
+                <i class="fas fa-circle text-danger"></i> 正在聆听...
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== JavaScript引用 ==================== -->
+    <!-- jQuery库 -->
+    <script src="https://code.jquery.com/jquery-3.6.0/min.js"></script>
+    <!-- Bootstrap 5 JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- 自定义JavaScript功能 -->
+    <script src="script.js"></script>
+    
+    <!-- 机器人交互功能 -->
+    <script>
+        // === 配置 ===
+        const API_CONFIG = {
+        //    key: '', // API密钥现在通过Netlify环境变量管理
+            api: '/.netlify/functions/chat' // 使用Netlify函数代理解决CORS问题
+        };
+
+        const bot = document.getElementById('bot');
+        
+        // === 交互逻辑 ===
+        function toggleRobot() {
+            try {
+                const robotIcon = document.getElementById('robot-icon');
+                const panel = document.getElementById('panel');
+                const hint = document.querySelector('.hint');
+                
+                const isExpanded = bot.style.display !== 'none';
+                
+                if (isExpanded) {
+                    // 收起机器人界面
+                    robotIcon.style.display = 'flex';
+                    bot.style.display = 'none';
+                    panel.style.display = 'none';
+                    hint.style.display = 'none';
+                } else {
+                    // 展开机器人界面
+                    robotIcon.style.display = 'none';
+                    bot.style.display = 'block';
+                    panel.style.display = 'flex';
+                    hint.style.display = 'block';
+                    
+                    // 打开时切换动作
+                    bot.animationName = "Jump";
+                    setTimeout(() => { 
+                        if(!window.speechSynthesis.speaking) bot.animationName = "Idle"; 
+                    }, 1000);
+
+                    if(document.getElementById('logs').children.length === 0) {
+                        const welcome = "欢迎回来，先生。JARVIS 已上线，请指示。";
+                        addLog(welcome, 'sys');
+                        
+                        // 尝试语音，但即使失败也要继续
+                        try {
+                            speak(welcome);
+                        } catch (speakError) {
+                            console.warn("语音功能不可用:", speakError);
+                            addLog("语音功能在当前环境中不可用", 'sys');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("切换机器人界面时出错:", error);
+                // 确保至少显示聊天框
+                const panel = document.getElementById('panel');
+                const robotIcon = document.getElementById('robot-icon');
+                if (panel) panel.style.display = 'flex';
+                if (robotIcon) robotIcon.style.display = 'none';
+            }
+        }
+
+        // === 语音识别功能 ===
+        let recognition = null;
+        let isListening = false;
+        
+        // 初始化语音识别
+        function initSpeechRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'zh-CN';
+                
+                recognition.onstart = function() {
+                    isListening = true;
+                    updateVoiceButton();
+                    document.getElementById('voiceStatus').style.display = 'block';
+                    addLog("语音识别已启动，请开始说话...", 'sys');
+                };
+                
+                recognition.onresult = function(event) {
+                    const transcript = event.results[0][0].transcript;
+                    document.getElementById('ipt').value = transcript;
+                    document.getElementById('voiceStatus').style.display = 'none';
+                    addLog(`语音输入: ${transcript}`, 'user');
+                    
+                    // 自动发送识别结果
+                    setTimeout(() => {
+                        send();
+                    }, 500);
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error("语音识别错误:", event.error);
+                    isListening = false;
+                    updateVoiceButton();
+                    document.getElementById('voiceStatus').style.display = 'none';
+                    
+                    let errorMsg = "语音识别错误";
+                    if (event.error === 'not-allowed') {
+                        errorMsg = "请允许浏览器使用麦克风权限";
+                    } else if (event.error === 'no-speech') {
+                        errorMsg = "未检测到语音，请重试";
+                    } else if (event.error === 'audio-capture') {
+                        errorMsg = "未检测到麦克风设备";
+                    }
+                    
+                    addLog(errorMsg, 'sys');
+                };
+                
+                recognition.onend = function() {
+                    // 只有在仍然处于监听状态时才更新UI
+                    if (isListening) {
+                        isListening = false;
+                        updateVoiceButton();
+                        document.getElementById('voiceStatus').style.display = 'none';
+                        addLog("语音识别已自动停止", 'sys');
+                    }
+                };
+                
+                return true;
+            } else {
+                console.warn("浏览器不支持语音识别");
+                addLog("当前浏览器不支持语音识别功能", 'sys');
+                return false;
+            }
+        }
+        
+        // 切换语音输入状态
+        function toggleVoiceInput() {
+            if (isListening) {
+                // 停止当前语音识别
+                try {
+                    recognition.stop();
+                } catch (stopError) {
+                    console.error("停止语音识别失败:", stopError);
+                }
+                isListening = false;
+                updateVoiceButton();
+                document.getElementById('voiceStatus').style.display = 'none';
+                addLog("语音识别已停止", 'sys');
+                // 重置recognition对象，以便下次重新初始化
+                recognition = null;
+            } else {
+                // 确保每次启动都重新初始化
+                if (!recognition && !initSpeechRecognition()) {
+                    addLog("无法初始化语音识别功能", 'sys');
+                    return;
+                }
+                
+                try {
+                    recognition.start();
+                } catch (error) {
+                    console.error("启动语音识别失败:", error);
+                    addLog("启动语音识别失败，请重试", 'sys');
+                    // 启动失败时也重置recognition对象
+                    recognition = null;
+                    isListening = false;
+                    updateVoiceButton();
+                }
+            }
+        }
+        
+        // 更新语音按钮状态
+        function updateVoiceButton() {
+            const voiceBtn = document.getElementById('voiceBtn');
+            const icon = voiceBtn.querySelector('i');
+            if (isListening) {
+                voiceBtn.classList.remove('btn-outline-secondary');
+                voiceBtn.classList.add('btn-danger');
+                icon.className = 'fas fa-microphone-slash';
+                voiceBtn.title = '停止语音输入';
+            } else {
+                voiceBtn.classList.remove('btn-danger');
+                voiceBtn.classList.add('btn-outline-secondary');
+                icon.className = 'fas fa-microphone';
+                voiceBtn.title = '开始语音输入';
+            }
+        }
+        
+        // === 大脑与语音 ===
+        async function send() {
+            const ipt = document.getElementById('ipt');
+            const text = ipt.value.trim();
+            if(!text) return;
+
+            addLog(text, 'user');
+            ipt.value = '';
+
+            try {
+                console.log("开始调用DeepSeek API...");
+                const res = await fetch(API_CONFIG.api, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json'
+                        // Authorization头由Netlify函数处理，前端不再发送
+                    },
+                    body: JSON.stringify({
+                        model: 'deepseek-chat',
+                        messages: [{role: 'user', content: text}],
+                        max_tokens: 500
+                    })
+                });
+                
+                console.log("API响应状态:", res.status);
+                
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    console.error("API错误响应:", errorText);
+                    throw new Error(`API错误: ${res.status} - ${errorText}`);
+                }
+                
+                const data = await res.json();
+                console.log("API响应数据:", data);
+                
+                if (data.choices && data.choices.length > 0) {
+                    const reply = data.choices[0].message.content;
+                    addLog(reply, 'sys');
+                    
+                    // 尝试语音，但即使失败也要继续
+                    try {
+                        speak(reply);
+                    } catch (speakError) {
+                        console.warn("语音功能不可用:", speakError);
+                    }
+                } else {
+                    throw new Error("API响应格式错误");
+                }
+                
+            } catch (e) {
+                console.error("DeepSeek API调用失败:", e);
+                let errorMessage = "连接超时（请检查网络或Key配额）";
+                
+                if (e.message.includes('Failed to fetch')) {
+                    errorMessage = "网络连接失败，请检查网络连接";
+                } else if (e.message.includes('401')) {
+                    errorMessage = "API密钥无效或已过期";
+                } else if (e.message.includes('429')) {
+                    errorMessage = "API调用频率超限，请稍后再试";
+                } else if (e.message.includes('403')) {
+                    errorMessage = "访问被拒绝，请检查API权限";
+                }
+                
+                addLog(errorMessage, 'sys');
+            }
+        }
+
+        function speak(text) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'zh-CN';
+            u.rate = 1.1;
+
+            u.onstart = () => {
+                // 关键修正：这里只改动画名，不改 src，不会导致重载
+                bot.animationName = "Wave"; // 说话时挥手/动作
+            };
+
+            u.onend = () => {
+                bot.animationName = "Idle"; // 说完恢复待机
+            };
+
+            window.speechSynthesis.speak(u);
+        }
+
+        function addLog(txt, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerText = txt;
+            document.getElementById('logs').appendChild(div);
+            document.getElementById('logs').scrollTop = 9999;
+        }
+
+        // 回车发送
+        document.getElementById('ipt').onkeypress = (e) => {
+            if(e.key === 'Enter') send();
+        };
+        
+        // 页面加载时添加提示
+        document.addEventListener('DOMContentLoaded', function() {
+            // 自动聚焦到输入框
+            document.getElementById('ipt').focus();
+            // 添加提示
+            setTimeout(() => {
+                if (document.getElementById('logs').children.length === 0) {
+                    addLog("提示：点击麦克风按钮开始语音输入，或直接在输入框中输入文字", 'sys');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
